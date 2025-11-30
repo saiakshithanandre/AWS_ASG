@@ -35,7 +35,7 @@ jobs:
       - name: Select environment
         id: env_selector
         run: |
-          echo "env_dir=infra/terraform/envs/${{ github.event.inputs.environment }}" >> "$GITHUB_OUTPUT"
+          echo "env_dir=Infra/terraform/envs/${{ github.event.inputs.environment }}" >> "$GITHUB_OUTPUT"
 
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3

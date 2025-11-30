@@ -44,12 +44,12 @@ jobs:
           aws sts get-caller-identity || echo "AWS creds check complete"
 
       - name: Validate Packer template
-        working-directory: infra/packer
+        working-directory: Infra/packer
         run: packer validate app-ami.pkr.hcl
 
       - name: Build AMI
         id: packer
-        working-directory: infra/packer
+        working-directory: Infra/packer
         env:
           AWS_REGION: ${{ env.AWS_REGION }}
         run: |
