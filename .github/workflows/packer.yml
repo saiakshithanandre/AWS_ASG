@@ -27,6 +27,7 @@ jobs:
       - name: Build JAR
         run: |
           ./mvnw -B clean package -DskipTests   # <-- skip tests so CI doesn't break
+          cp target/*.jar Infra/packer/app.jar   # <-- copy JAR to Packer directory
 
       - name: Install Packer
         uses: hashicorp/setup-packer@v3
