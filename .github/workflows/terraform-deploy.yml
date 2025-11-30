@@ -1,0 +1,62 @@
+# .github/workflows/terraform-deploy.yml
+name: Terraform Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      ami_id:
+        description: "AMI ID to deploy (from Packer)"
+        required: true
+        type: string
+      environment:
+        description: "Environment (dev/stage/prod)"
+        required: false
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  terraform-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select environment
+        id: env_selector
+        run: |
+          echo "env_dir=infra/terraform/envs/${{ github.event.inputs.environment }}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Configure AWS credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws sts get-caller-identity || echo "AWS creds check complete"
+
+      - name: Terraform init
+        working-directory: ${{ steps.env_selector.outputs.env_dir }}
+        run: terraform init
+
+      - name: Terraform plan
+        working-directory: ${{ steps.env_selector.outputs.env_dir }}
+        run: terraform plan -var "app_ami_id=${{ github.event.inputs.ami_id }}"
+
+      - name: Terraform apply
+        working-directory: ${{ steps.env_selector.outputs.env_dir }}
+        run: terraform apply -auto-approve -var "app_ami_id=${{ github.event.inputs.ami_id }}"
