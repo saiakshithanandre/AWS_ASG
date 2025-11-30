@@ -29,7 +29,7 @@ module "vpc" {
 
 # ASG + ALB + CPU scaling
 module "asg_app" {
-  source = "../../modules/asg_app"
+  source = "../../modules/asg"
 
   app_name          = "${var.app_name}-dev"
   vpc_id            = module.vpc.vpc_id
