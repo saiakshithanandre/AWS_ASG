@@ -33,7 +33,7 @@ build {
   sources = ["source.amazon-ebs.app"]
 
   provisioner "file" {
-    source      = "app/target/app.jar"
+    source      = "app.jar"
     destination = "/home/ec2-user/app.jar"
   }
 
