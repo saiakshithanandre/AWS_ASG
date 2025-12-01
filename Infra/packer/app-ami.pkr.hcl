@@ -15,6 +15,7 @@ variable "aws_region" {
 source "amazon-ebs" "app" {
   region                  = var.aws_region
   instance_type           = "t2.micro"
+  profile = "github"
   ami_name                = "spring-boot-demo-{{timestamp}}"
   source_ami_filter {
     filters = {
@@ -40,7 +41,9 @@ build {
   provisioner "shell" {
     inline = [
       "sudo yum update -y",
-      "sudo amazon-linux-extras install java-openjdk17 -y || sudo yum install -y java-17-openjdk",
+      "sudo rpm --import https://yum.corretto.aws/corretto.key",
+      "sudo curl -L -o /etc/yum.repos.d/corretto.repo https://yum.corretto.aws/corretto.repo",
+      "sudo yum install -y java-17-amazon-corretto-devel",
       "sudo mv /home/ec2-user/app.jar /opt/app.jar",
       "echo '[Unit]' | sudo tee /etc/systemd/system/app.service",
       "echo 'Description=Spring Boot App' | sudo tee -a /etc/systemd/system/app.service",
@@ -53,4 +56,5 @@ build {
       "sudo systemctl enable app.service"
     ]
   }
+
 }

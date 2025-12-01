@@ -51,7 +51,7 @@ variable "app_port" {
 variable "health_check_path" {
   description = "HTTP health check path for ALB"
   type        = string
-  default     = "/actuator/health"
+  default     = "/HealthCheck"
 }
 
 # 🔼 Scale out when CPU > threshold
