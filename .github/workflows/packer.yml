@@ -58,14 +58,13 @@ jobs:
       - name: Build AMI
         id: packer
         working-directory: Infra/packer
-        env:                             # <-- give Packer full AWS env here
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        env:
           AWS_REGION: ${{ env.AWS_REGION }}
         run: |
           AMI_ID=$(packer build -machine-readable \
             -var "aws_region=${AWS_REGION}" app-ami.pkr.hcl \
             | awk -F, '$0 ~/artifact,0,id/ {print $6}' | sed 's/.*://')
+
           echo "ami_id=$AMI_ID" >> "$GITHUB_OUTPUT"
           echo "Built AMI: $AMI_ID"
 
