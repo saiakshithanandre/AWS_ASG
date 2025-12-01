@@ -40,7 +40,7 @@ build {
   provisioner "shell" {
     inline = [
       "sudo yum update -y",
-      "sudo amazon-linux-extras install java-openjdk11 -y || sudo yum install -y java-11-openjdk",
+      "sudo amazon-linux-extras install java-openjdk17 -y || sudo yum install -y java-17-openjdk",
       "sudo mv /home/ec2-user/app.jar /opt/app.jar",
       "echo '[Unit]' | sudo tee /etc/systemd/system/app.service",
       "echo 'Description=Spring Boot App' | sudo tee -a /etc/systemd/system/app.service",
