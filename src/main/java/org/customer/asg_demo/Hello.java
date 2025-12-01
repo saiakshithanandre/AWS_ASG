@@ -10,6 +10,10 @@ public class Hello {
     public String sayHello() {
         return "Hi, welcome to my page!";
     }
+    @GetMapping("/hi")
+    public String sayHi() {
+        return "Hi, Akshitha here!";
+    }
     @GetMapping("/HealthCheck")
     public ResponseEntity<?> healthCheck() {
         return ResponseEntity.ok().body("Service is up and running");
