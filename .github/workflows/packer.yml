@@ -1,73 +1,125 @@
-# .github/workflows/packer-ami.yml
-name: Build AMI with Packer
+name: Build AMI from Docker image
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch: {}   # manual only
 
 env:
   AWS_REGION: us-east-1
+  DOCKER_IMAGE: akshithanandre/spring-boot-demo:latest   # use the latest tag from your docker workflow
 
 jobs:
-  packer-build-ami:
+  build-ami:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
+
+    env:
+      AWS_REGION: ${{ env.AWS_REGION }}
+      DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Build JAR
-        run: |
-          ./mvnw -B clean package -DskipTests   # <-- skip tests so CI doesn't break
-          cp target/*.jar Infra/packer/app.jar    # <-- copy JAR to Packer directory
 
       - name: Install Packer
         uses: hashicorp/setup-packer@v3
         with:
-          version: "1.14.3"
+          version: latest
 
       - name: Configure AWS credentials
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          aws sts get-caller-identity || echo "AWS creds check complete"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Packer init
-        working-directory: Infra/packer
-        run: |
-          packer init app-ami.pkr.hcl
+        run: packer init app-ami.pkr.hcl
 
-      - name: Validate Packer template
-        working-directory: Infra/packer
-        env:                           # <-- Packer may need region/creds here too
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ env.AWS_REGION }}
-        run: |
-          packer validate app-ami.pkr.hcl
-
-      - name: Build AMI
-        id: packer
-        working-directory: Infra/packer
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
+      - name: Packer build AMI
+        id: packer-build
         run: |
           AMI_ID=$(packer build -machine-readable \
-            -var "aws_region=${AWS_REGION}" app-ami.pkr.hcl \
-            | awk -F, '$0 ~/artifact,0,id/ {print $6}' | sed 's/.*://')
+            -var "aws_region=${AWS_REGION}" \
+            -var "docker_image=${DOCKER_IMAGE}" \
+            app-ami.pkr.hcl | awk -F, '$0 ~/artifact,0,id/ {print $6}' | sed 's/.*://')
 
-          echo "ami_id=$AMI_ID" >> "$GITHUB_OUTPUT"
           echo "Built AMI: $AMI_ID"
+          echo "ami_id=$AMI_ID" >> "$GITHUB_OUTPUT"
 
       - name: Show AMI ID
-        run: |
-          echo "New AMI ID is: ${{ steps.packer.outputs.ami_id }}"
+        run: echo "AMI ID from Packer = ${{ steps.packer-build.outputs.ami_id }}"
+
+
+
+## .github/workflows/packer-ami.yml
+#name: Build AMI with Packer
+#
+#on:
+#  workflow_dispatch: {}
+#
+#env:
+#  AWS_REGION: us-east-1
+#
+#jobs:
+#  packer-build-ami:
+#    runs-on: ubuntu-latest
+#    defaults:
+#      run:
+#        shell: bash
+#
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#
+#      - name: Set up JDK 17
+#        uses: actions/setup-java@v4
+#        with:
+#          distribution: temurin
+#          java-version: "17"
+#
+#      - name: Build JAR
+#        run: |
+#          ./mvnw -B clean package -DskipTests   # <-- skip tests so CI doesn't break
+#          cp target/*.jar Infra/packer/app.jar    # <-- copy JAR to Packer directory
+#
+#      - name: Install Packer
+#        uses: hashicorp/setup-packer@v3
+#        with:
+#          version: "1.14.3"
+#
+#      - name: Configure AWS credentials
+#        env:
+#          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#        run: |
+#          aws sts get-caller-identity || echo "AWS creds check complete"
+#
+#      - name: Packer init
+#        working-directory: Infra/packer
+#        run: |
+#          packer init app-ami.pkr.hcl
+#
+#      - name: Validate Packer template
+#        working-directory: Infra/packer
+#        env:                           # <-- Packer may need region/creds here too
+#          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#          AWS_REGION: ${{ env.AWS_REGION }}
+#        run: |
+#          packer validate app-ami.pkr.hcl
+#
+#      - name: Build AMI
+#        id: packer
+#        working-directory: Infra/packer
+#        env:
+#          AWS_REGION: ${{ env.AWS_REGION }}
+#        run: |
+#          AMI_ID=$(packer build -machine-readable \
+#            -var "aws_region=${AWS_REGION}" app-ami.pkr.hcl \
+#            | awk -F, '$0 ~/artifact,0,id/ {print $6}' | sed 's/.*://')
+#
+#          echo "ami_id=$AMI_ID" >> "$GITHUB_OUTPUT"
+#          echo "Built AMI: $AMI_ID"
+#
+#      - name: Show AMI ID
+#        run: |
+#          echo "New AMI ID is: ${{ steps.packer.outputs.ami_id }}"
