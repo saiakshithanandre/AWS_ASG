@@ -14,6 +14,10 @@ public class Hello {
     public String sayHi() {
         return "Hi, Akshitha here!";
     }
+    @GetMapping("/test")
+    public String test() {
+        return "ASG Demo Test Page for update and refresh";
+    }
     @GetMapping("/HealthCheck")
     public ResponseEntity<?> healthCheck() {
         return ResponseEntity.ok().body("Service is up and running");
