@@ -32,15 +32,6 @@ jobs:
         working-directory: Infra/packer
         run: packer init app-ami.pkr.hcl
 
-      - name: Validate Packer template
-        working-directory: Infra/packer
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ env.AWS_REGION }}
-        run: |
-          packer validate app-ami.pkr.hcl
-
       - name: Packer build AMI
         working-directory: Infra/packer
         id: packer-build
