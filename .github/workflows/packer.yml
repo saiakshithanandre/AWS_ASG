@@ -1,69 +1,63 @@
-# .github/workflows/packer-ami.yml
-name: Build AMI from Docker image
+name: Build AMI from Docker Image
 
 on:
-  workflow_dispatch: {}   # manual only
+  workflow_dispatch: {}   # run manually only
 
 env:
   AWS_REGION: us-east-1
-  DOCKER_IMAGE: akshithanandre/spring-boot-demo:latest  # image pushed by your docker workflow
+  DOCKER_IMAGE: akshithanandre/spring-boot-demo:latest
 
 jobs:
   build-ami:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Install Packer
         uses: hashicorp/setup-packer@v3
         with:
-            version: "1.14.3"
+          version: latest
 
       - name: Configure AWS credentials
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          aws sts get-caller-identity || echo "AWS creds check complete"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Packer init
         working-directory: Infra/packer
-        run: |
-          packer init app-ami.pkr.hcl
+        run: packer init app-ami.pkr.hcl
 
-
-      - name: Packer validate
-        working-directory: Infra/packer
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-          DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
-        run: |
-          packer validate \
-            -var "aws_region=${AWS_REGION}" \
-            -var "docker_image=${DOCKER_IMAGE}" \
-            app-ami.pkr.hcl
-
-      - name: Packer build AMI
+      - name: Build AMI with Packer
         id: packer-build
         working-directory: Infra/packer
         env:
           AWS_REGION: ${{ env.AWS_REGION }}
           DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
         run: |
-          echo "Using docker image: ${DOCKER_IMAGE}"
+          echo "Building AMI in region=${AWS_REGION} using image=${DOCKER_IMAGE}"
 
-          # run packer with machine-readable output and capture it
-          PACKER_LOG=1 packer build -machine-readable \
+          # Build AMI and capture machine-readable log
+          packer build -machine-readable \
             -var "aws_region=${AWS_REGION}" \
             -var "docker_image=${DOCKER_IMAGE}" \
             app-ami.pkr.hcl | tee packer-output.log
 
-          # extract AMI ID from the machine-readable log
+          echo "==== Extracting AMI ID from Packer output ===="
+
           AMI_ID=$(grep -m1 'artifact,0,id' packer-output.log | awk -F, '{print $6}' | sed 's/.*://')
           echo "AMI_ID=${AMI_ID}"
+
+          # Fail if no AMI ID
+          if [ -z "$AMI_ID" ]; then
+            echo "ERROR: No AMI ID found in Packer output. Failing the job."
+            exit 1
+          fi
 
           echo "ami_id=${AMI_ID}" >> "$GITHUB_OUTPUT"
 
       - name: Show AMI ID
-        run: echo "AMI ID from Packer = ${{ steps.packer-build.outputs.ami_id }}"
+        run: echo "Created AMI ID = ${{ steps.packer-build.outputs.ami_id }}"

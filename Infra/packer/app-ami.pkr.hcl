@@ -1,4 +1,8 @@
+// Infra/packer/app-ami.pkr.hcl
+
 packer {
+  required_version = ">= 1.8.0"
+
   required_plugins {
     amazon = {
       source  = "github.com/hashicorp/amazon"
@@ -13,6 +17,7 @@ variable "aws_region" {
 }
 
 // Docker image in Docker Hub, passed from GitHub Actions
+// e.g. akshithanandre/spring-boot-demo:latest
 variable "docker_image" {
   type = string
 }
@@ -28,22 +33,32 @@ variable "instance_type" {
   default = "t3.micro"
 }
 
-source "amazon-ebs" "app" {
-  region         = var.aws_region
-  source_ami     = var.source_ami
-  instance_type  = var.instance_type
-  ssh_username   = "ec2-user"
+variable "ami_name_prefix" {
+  type    = string
+  default = "spring-docker-app"
+}
 
-  ami_name       = "spring-docker-app-{{timestamp}}"
+source "amazon-ebs" "docker_app" {
+  region        = var.aws_region
+  source_ami    = var.source_ami
+  instance_type = var.instance_type
+  ssh_username  = "ec2-user"
 
-  // you can add vpc_id / subnet_id / security_group_id later if needed
+  ami_name = "${var.ami_name_prefix}-${formatdate("YYYYMMDDhhmmss", timestamp())}"
+
+  associate_public_ip_address = true
+
+  tags = {
+    Name = var.ami_name_prefix
+    Role = "spring-boot-docker-app"
+  }
 }
 
 build {
-  name    = "spring-docker-app"
-  sources = ["source.amazon-ebs.app"]
+  name    = "spring-docker-app-build"
+  sources = ["source.amazon-ebs.docker_app"]
 
-  // Install Docker
+  # 1) Install Docker on Amazon Linux 2
   provisioner "shell" {
     inline = [
       "sudo yum update -y",
@@ -54,11 +69,13 @@ build {
     ]
   }
 
-  // Pull your image & configure systemd to run it
+  # 2) Pull your Docker image & create a systemd service to run it
   provisioner "shell" {
     inline = [
+      # Pull image
       "sudo docker pull ${var.docker_image}",
 
+      # Create systemd unit file
       "echo '[Unit]' | sudo tee /etc/systemd/system/app.service",
       "echo 'Description=Dockerized Spring Boot App' | sudo tee -a /etc/systemd/system/app.service",
       "echo 'After=docker.service' | sudo tee -a /etc/systemd/system/app.service",
@@ -71,6 +88,7 @@ build {
       "echo '[Install]' | sudo tee -a /etc/systemd/system/app.service",
       "echo 'WantedBy=multi-user.target' | sudo tee -a /etc/systemd/system/app.service",
 
+      # Enable service
       "sudo systemctl daemon-reload",
       "sudo systemctl enable app.service",
     ]
