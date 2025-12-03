@@ -1,0 +1,74 @@
+
+# .github/workflows/packer-ami.yml
+name: Build AMI with Packer
+
+on:
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  packer-build-ami:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build JAR
+        run: |
+          ./mvnw -B clean package -DskipTests   # <-- skip tests so CI doesn't break
+          cp target/*.jar Infra/packer/app.jar    # <-- copy JAR to Packer directory
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@v3
+        with:
+          version: "1.14.3"
+
+      - name: Configure AWS credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws sts get-caller-identity || echo "AWS creds check complete"
+
+      - name: Packer init
+        working-directory: Infra/packer
+        run: |
+          packer init app-ami.pkr.hcl
+
+      - name: Validate Packer template
+        working-directory: Infra/packer
+        env:                           # <-- Packer may need region/creds here too
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          packer validate app-ami.pkr.hcl
+
+      - name: Build AMI
+        id: packer
+        working-directory: Infra/packer
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          AMI_ID=$(packer build -machine-readable \
+            -var "aws_region=${AWS_REGION}" app-ami.pkr.hcl \
+            | awk -F, '$0 ~/artifact,0,id/ {print $6}' | sed 's/.*://')
+
+          echo "ami_id=$AMI_ID" >> "$GITHUB_OUTPUT"
+          echo "Built AMI: $AMI_ID"
+
+      - name: Show AMI ID
+        run: |
+          echo "New AMI ID is: ${{ steps.packer.outputs.ami_id }}"
