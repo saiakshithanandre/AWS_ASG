@@ -6,6 +6,8 @@ on:
 env:
   AWS_REGION: us-east-1
   DOCKER_IMAGE: akshithanandre/spring-boot-demo:latest
+  LAUNCH_TEMPLATE_NAME: spring-boot-demo-dev-lt-20251203023912983700000002
+  ASG_NAME: spring-boot-demo-dev-asg
 
 jobs:
   build-ami:
