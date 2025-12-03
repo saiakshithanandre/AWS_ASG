@@ -1,17 +1,23 @@
-name: Build AMI from Docker Image
+name: Build AMI and Update ASG
 
 on:
-  workflow_dispatch: {}   # run manually only
+  push:
+    branches: [ "main" ]      # run automatically on push to main
+  workflow_dispatch: {}        # or run manually
 
 env:
   AWS_REGION: us-east-1
   DOCKER_IMAGE: akshithanandre/spring-boot-demo:latest
+
   LAUNCH_TEMPLATE_NAME: spring-boot-demo-dev-lt-20251203023912983700000002
   ASG_NAME: spring-boot-demo-dev-asg
 
 jobs:
   build-ami:
     runs-on: ubuntu-latest
+
+    outputs:
+      ami_id: ${{ steps.packer-build.outputs.ami_id }}
 
     steps:
       - name: Checkout repository
@@ -63,15 +69,10 @@ jobs:
 
       - name: Show AMI ID
         run: echo "Created AMI ID = ${{ steps.packer-build.outputs.ami_id }}"
+
   update-asg:
     runs-on: ubuntu-latest
     needs: build-ami
-
-    env:
-      AWS_REGION: ${{ env.AWS_REGION }}
-      LAUNCH_TEMPLATE_NAME: ${{ env.LAUNCH_TEMPLATE_NAME }}
-      ASG_NAME: ${{ env.ASG_NAME }}
-      AMI_ID: ${{ needs.build-ami.outputs.ami_id }}
 
     steps:
       - name: Configure AWS credentials
@@ -82,9 +83,13 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Create new launch template version with new AMI
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          LAUNCH_TEMPLATE_NAME: ${{ env.LAUNCH_TEMPLATE_NAME }}
+          AMI_ID: ${{ needs.build-ami.outputs.ami_id }}
         run: |
           echo "Creating new Launch Template version for ${LAUNCH_TEMPLATE_NAME} with AMI ${AMI_ID}"
-          
+
           aws ec2 create-launch-template-version \
             --launch-template-name "${LAUNCH_TEMPLATE_NAME}" \
             --source-version '$Latest' \
@@ -92,18 +97,25 @@ jobs:
             --region "${AWS_REGION}"
 
       - name: Update ASG to use latest Launch Template version
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          LAUNCH_TEMPLATE_NAME: ${{ env.LAUNCH_TEMPLATE_NAME }}
+          ASG_NAME: ${{ env.ASG_NAME }}
         run: |
           echo "Updating ASG ${ASG_NAME} to use latest version of LT ${LAUNCH_TEMPLATE_NAME}"
-          
+
           aws autoscaling update-auto-scaling-group \
             --auto-scaling-group-name "${ASG_NAME}" \
             --launch-template "LaunchTemplateName=${LAUNCH_TEMPLATE_NAME},Version=\$Latest" \
             --region "${AWS_REGION}"
 
       - name: Start instance refresh
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ASG_NAME: ${{ env.ASG_NAME }}
         run: |
           echo "Starting instance refresh on ASG ${ASG_NAME}"
-          
+
           aws autoscaling start-instance-refresh \
             --auto-scaling-group-name "${ASG_NAME}" \
             --preferences '{
