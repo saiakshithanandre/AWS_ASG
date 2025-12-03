@@ -10,20 +10,20 @@
 
 
 
-new launch template version with new AMI
+//new launch template version with new AMI
 aws ec2 create-launch-template-version \
   --launch-template-name spring-boot-demo-dev-lt-20251201011025752600000002 \
   --source-version '$Latest' \
   --launch-template-data "{
     \"ImageId\": \"ami-01a4267da4dc486a9\"
   }"
-asg update with new launch template version
+//asg update with new launch template version
 aws autoscaling update-auto-scaling-group \
   --auto-scaling-group-name spring-boot-demo-dev-asg \
   --launch-template '{"LaunchTemplateName":"spring-boot-demo-dev-lt-20251201011025752600000002","Version":"$Latest"}' \
   --region us-east-1
 
-
+//start instance refresh
 aws autoscaling start-instance-refresh \
   --auto-scaling-group-name spring-boot-demo-dev-asg \
   --preferences '{

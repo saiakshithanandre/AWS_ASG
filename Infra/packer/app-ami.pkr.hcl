@@ -15,7 +15,7 @@ variable "aws_region" {
 source "amazon-ebs" "app" {
   region                  = var.aws_region
   instance_type           = "t2.micro"
-  profile = "github"
+  # profile = "github"
   ami_name                = "spring-boot-demo-{{timestamp}}"
   source_ami_filter {
     filters = {
